@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+body {
+  @apply bg-nebula-900 text-white min-h-screen;
+}
+
+.glow-card {
+  @apply bg-nebula-800/80 border border-nebula-600/50 rounded-2xl shadow-lg shadow-nebula-900/40;
+}
+
+.panel-title {
+  @apply text-sm uppercase tracking-[0.2em] text-nebula-200;
+}
