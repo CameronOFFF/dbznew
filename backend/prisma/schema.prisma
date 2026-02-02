@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PLAYER
+  ADMIN
+}
+
+enum CurrencyType {
+  ZENI
+  GEMAS
+}
+
+enum ItemCategory {
+  CONSUMABLE
+  EQUIPMENT
+  MATERIAL
+  COSMETIC
+}
+
+enum QuestType {
+  DAILY
+  WEEKLY
+  REPEATABLE
+}
+
+enum SagaDifficulty {
+  NORMAL
+  HARD
+}
+
+enum AuditAction {
+  LOGIN
+  TRANSACTION
+  PVP
+  DROP
+  ADMIN
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  username        String   @unique
+  passwordHash    String
+  legacyMd5       Boolean  @default(false)
+  role            UserRole @default(PLAYER)
+  isBanned        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  refreshTokens   RefreshToken[]
+  preferences     UserPreference?
+  player          Player?
+  auditLogs       AuditLog[]
+  transactions    WalletTransaction[]
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
+}
+
+model UserPreference {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  language        String   @default("pt-BR")
+  theme           String   @default("dark")
+  notifications   Boolean  @default(true)
+  twoFactorSecret String?
+}
+
+model Player {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  name         String
+  avatarUrl    String?
+  raceClassId  String
+  raceClass    RaceClass @relation(fields: [raceClassId], references: [id])
+  level        Int      @default(1)
+  experience   Int      @default(0)
+  statPoints   Int      @default(0)
+  strength     Int      @default(5)
+  defense      Int      @default(5)
+  resilience   Int      @default(5)
+  agility      Int      @default(5)
+  speed        Int      @default(5)
+  energy       Int      @default(100)
+  critChance   Float    @default(0.05)
+  critDamage   Float    @default(1.5)
+  hp           Int      @default(100)
+  ki           Int      @default(50)
+  stamina      Int      @default(100)
+  title        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  inventory    InventoryItem[]
+  equipment    EquipmentSlot[]
+  quests       PlayerQuest[]
+  sagaProgress SagaProgress[]
+  arenaProfile ArenaProfile?
+  clanMember   ClanMember?
+  matchLogs    BattleLog[]
+}
+
+model RaceClass {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String
+  baseStrength  Int
+  baseDefense   Int
+  baseResilience Int
+  baseAgility   Int
+  baseSpeed     Int
+  baseEnergy    Int
+  createdAt     DateTime @default(now())
+
+  players      Player[]
+}
+
+model WalletTransaction {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  currency     CurrencyType
+  amount       Int
+  balanceAfter Int
+  reason       String
+  createdAt    DateTime      @default(now())
+}
+
+model Item {
+  id          String        @id @default(uuid())
+  name        String
+  description String
+  category    ItemCategory
+  rarity      String
+  effectJson  Json
+  createdAt   DateTime      @default(now())
+
+  inventory   InventoryItem[]
+  equipment   EquipmentSlot[]
+}
+
+model InventoryItem {
+  id        String  @id @default(uuid())
+  playerId  String
+  player    Player  @relation(fields: [playerId], references: [id])
+  itemId    String
+  item      Item    @relation(fields: [itemId], references: [id])
+  quantity  Int     @default(1)
+  createdAt DateTime @default(now())
+}
+
+model EquipmentSlot {
+  id        String  @id @default(uuid())
+  playerId  String
+  player    Player  @relation(fields: [playerId], references: [id])
+  slot      String
+  itemId    String?
+  item      Item?   @relation(fields: [itemId], references: [id])
+}
+
+model Quest {
+  id          String     @id @default(uuid())
+  title       String
+  description String
+  questType   QuestType
+  objectives  Json
+  rewards     Json
+  createdAt   DateTime   @default(now())
+
+  playerQuests PlayerQuest[]
+}
+
+model PlayerQuest {
+  id        String  @id @default(uuid())
+  playerId  String
+  player    Player  @relation(fields: [playerId], references: [id])
+  questId   String
+  quest     Quest   @relation(fields: [questId], references: [id])
+  progress  Int     @default(0)
+  completed Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model SagaChapter {
+  id          String        @id @default(uuid())
+  title       String
+  synopsis    String
+  minLevel    Int
+  energyCost  Int
+  difficulty  SagaDifficulty
+  rewards     Json
+  createdAt   DateTime      @default(now())
+
+  progress    SagaProgress[]
+}
+
+model SagaProgress {
+  id          String @id @default(uuid())
+  playerId    String
+  player      Player @relation(fields: [playerId], references: [id])
+  chapterId   String
+  chapter     SagaChapter @relation(fields: [chapterId], references: [id])
+  completed   Boolean @default(false)
+  completedAt DateTime?
+}
+
+model ArenaProfile {
+  id        String @id @default(uuid())
+  playerId  String @unique
+  player    Player @relation(fields: [playerId], references: [id])
+  elo       Int    @default(1000)
+  wins      Int    @default(0)
+  losses    Int    @default(0)
+  season    Int    @default(1)
+}
+
+model Tournament {
+  id          String @id @default(uuid())
+  name        String
+  scheduledAt DateTime
+  entryCost   Int
+  rewardJson  Json
+  createdAt   DateTime @default(now())
+}
+
+model Challenge {
+  id          String @id @default(uuid())
+  name        String
+  description String
+  week        Int
+  rewardJson  Json
+  createdAt   DateTime @default(now())
+}
+
+model Clan {
+  id        String @id @default(uuid())
+  name      String @unique
+  motto     String?
+  createdAt DateTime @default(now())
+
+  members   ClanMember[]
+}
+
+model ClanMember {
+  id        String @id @default(uuid())
+  clanId    String
+  clan      Clan   @relation(fields: [clanId], references: [id])
+  playerId  String @unique
+  player    Player @relation(fields: [playerId], references: [id])
+  role      String @default("MEMBER")
+  joinedAt  DateTime @default(now())
+}
+
+model BattleLog {
+  id        String   @id @default(uuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id])
+  mode      String
+  summary   Json
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  action    AuditAction
+  context   String
+  metadata  Json
+  createdAt DateTime    @default(now())
+}
